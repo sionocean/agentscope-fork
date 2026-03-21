@@ -15,3 +15,9 @@ DB_CONNECTION_STRING = os.environ.get(
 )
 
 BRAVE_API_KEY = os.environ["BRAVE_API_KEY"]
+
+# ReMe language: "cn" for Chinese, "en" for English (affects time parsing,
+# deduplication keywords, internal prompts)
+# ReMe language: "zh" for Chinese, "en" for English
+# NOTE: use "zh" not "cn" — prompt templates use _zh suffix
+REME_LANGUAGE = os.environ.get("REME_LANGUAGE", "zh")

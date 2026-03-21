@@ -29,8 +29,11 @@ interface ToolUseBlock {
 
 interface ToolResultBlock {
   type: "tool_result";
+  name?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  content: any;
+  content?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  output?: any;
 }
 
 type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock | ToolResultBlock;
@@ -158,11 +161,14 @@ const ToolUseView: React.FC<{ block: ToolUseBlock }> = ({ block }) => (
 );
 
 const ToolResultView: React.FC<{ block: ToolResultBlock }> = ({ block }) => {
-  const raw = block.content;
+  // AgentScope sends tool results as block.output (array of TextBlocks),
+  // not block.content. Handle both for safety.
+  const raw = block.output ?? block.content;
   let text: string;
   if (Array.isArray(raw)) {
     text = raw
-      .map((c) => (c.type === "text" ? (c as TextBlock).text : JSON.stringify(c)))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((c: any) => (c.type === "text" && c.text ? c.text : JSON.stringify(c)))
       .join("\n");
   } else if (typeof raw === "string") {
     text = raw;
@@ -184,7 +190,7 @@ const ToolResultView: React.FC<{ block: ToolResultBlock }> = ({ block }) => {
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 4, color: "#86efac" }}>
-        Tool result
+        Result{block.name ? `: ${block.name}` : ""}
       </div>
       <pre
         style={{

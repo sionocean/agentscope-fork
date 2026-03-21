@@ -1,3 +1,72 @@
+import sys
+import os
+import warnings
+from datetime import datetime
+
+# Suppress DeprecationWarnings from third-party libs (aiofiles, asyncio, etc.)
+# Must be set before any async code runs.
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
+
+# Ensure stdout is unbuffered so trace logs appear immediately
+if not os.environ.get("PYTHONUNBUFFERED"):
+    sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+
+# Auto-write logs to logs/ directory (tee: both terminal + file)
+_log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(_log_dir, exist_ok=True)
+_log_file = os.path.join(
+    _log_dir,
+    datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".log",
+)
+
+
+import re
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+# Specific noise patterns from CPython 3.14 internals and third-party libs.
+# These are exact substrings that only appear in warning/error output, not
+# in user content or API responses.
+_SUPPRESS = (
+    "DeprecationWarning: 'asyncio.iscoroutinefunction'",
+    "DeprecationWarning: websockets.legacy",
+    "DeprecationWarning: websockets.server.WebSocketServerProtocol",
+    "Unsupported block type thinking in the message, skipped.",
+)
+
+
+class _Tee:
+    """Write to both terminal (with colors) and log file (plain text)."""
+
+    def __init__(self, terminal, logfile):  # type: ignore[no-untyped-def]
+        self.terminal = terminal
+        self.logfile = logfile
+
+    def write(self, data: str) -> int:
+        if any(s in data for s in _SUPPRESS):
+            return len(data)
+        self.terminal.write(data)
+        self.terminal.flush()
+        self.logfile.write(_ANSI_RE.sub("", data))
+        self.logfile.flush()
+        return len(data)
+
+    def flush(self) -> None:
+        self.terminal.flush()
+        self.logfile.flush()
+
+    def fileno(self) -> int:
+        return self.terminal.fileno()
+
+    def isatty(self) -> bool:
+        return self.terminal.isatty()
+
+
+_log_fh = open(_log_file, "w", encoding="utf-8")  # noqa: SIM115
+sys.stdout = _Tee(sys.__stdout__, _log_fh)  # type: ignore[assignment]
+sys.stderr = _Tee(sys.__stderr__, _log_fh)  # type: ignore[assignment]
+print(f"Logging to {_log_file}")
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -58,6 +127,13 @@ async def get_history(user_id: str, session_id: str):
 async def delete_session(user_id: str, session_id: str):
     await manager.delete_session(user_id, session_id)
     return {"status": "deleted"}
+
+
+@app.delete("/memories/{user_id}")
+async def clear_memories(user_id: str):
+    """Delete all memories for a user from pgvector."""
+    deleted = await manager.clear_memories(user_id)
+    return {"status": "cleared", "deleted": deleted}
 
 
 @app.get("/memories/{user_id}")

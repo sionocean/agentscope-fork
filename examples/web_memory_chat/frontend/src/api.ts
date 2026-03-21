@@ -58,3 +58,8 @@ export async function getMemories(userId: string): Promise<MemoryItem[]> {
   const r = await fetch(`${BASE}/memories/${userId}`);
   return (await r.json()).memories;
 }
+
+export async function clearMemories(userId: string): Promise<number> {
+  const r = await fetch(`${BASE}/memories/${userId}`, { method: "DELETE" });
+  return (await r.json()).deleted ?? 0;
+}
