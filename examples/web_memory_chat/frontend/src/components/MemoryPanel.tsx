@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getMemories } from "../api";
+import { getMemories, clearMemories } from "../api";
 import type { MemoryItem } from "../types";
 
 interface MemoryPanelProps {
@@ -210,6 +210,28 @@ export default function MemoryPanel({ userId, refreshTrigger }: MemoryPanelProps
           }}
         >
           {loading ? "Loading…" : "↻ Refresh"}
+        </button>
+        <button
+          onClick={async () => {
+            if (!window.confirm(`Clear all memories for user "${userId}"?`)) return;
+            const n = await clearMemories(userId);
+            alert(`Cleared ${n} memories.`);
+            fetchMemories();
+          }}
+          disabled={loading || memories.length === 0}
+          title="Clear all memories"
+          style={{
+            background: "none",
+            border: "1px solid #553333",
+            borderRadius: 4,
+            color: "#e57373",
+            cursor: memories.length === 0 ? "not-allowed" : "pointer",
+            fontSize: 12,
+            padding: "3px 8px",
+            opacity: memories.length === 0 ? 0.4 : 1,
+          }}
+        >
+          Clear All
         </button>
       </div>
 
