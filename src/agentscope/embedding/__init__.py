@@ -9,6 +9,7 @@ from ._dashscope_multimodal_embedding import DashScopeMultiModalEmbedding
 from ._openai_embedding import OpenAITextEmbedding
 from ._gemini_embedding import GeminiTextEmbedding
 from ._ollama_embedding import OllamaTextEmbedding
+from ._ark_embedding import ArkEmbedding
 from ._cache_base import EmbeddingCacheBase
 from ._file_cache import FileEmbeddingCache
 
@@ -22,6 +23,7 @@ __all__ = [
     "OpenAITextEmbedding",
     "GeminiTextEmbedding",
     "OllamaTextEmbedding",
+    "ArkEmbedding",
     "EmbeddingCacheBase",
     "FileEmbeddingCache",
 ]

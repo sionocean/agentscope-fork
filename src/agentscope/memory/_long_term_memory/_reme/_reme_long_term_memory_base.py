@@ -67,11 +67,13 @@ Example:
 
 """
 from abc import ABCMeta
-from typing import Any
+from typing import Any, List
 
 from .._long_term_memory_base import LongTermMemoryBase
 from ....embedding import DashScopeTextEmbedding, OpenAITextEmbedding
+from ....embedding._embedding_base import EmbeddingModelBase
 from ....model import DashScopeChatModel, OpenAIChatModel
+from ....model._model_base import ChatModelBase
 
 
 class ReMeLongTermMemoryBase(LongTermMemoryBase, metaclass=ABCMeta):
@@ -96,11 +98,10 @@ class ReMeLongTermMemoryBase(LongTermMemoryBase, metaclass=ABCMeta):
         agent_name: str | None = None,
         user_name: str | None = None,
         run_name: str | None = None,
-        model: DashScopeChatModel | OpenAIChatModel | None = None,
-        embedding_model: (
-            DashScopeTextEmbedding | OpenAITextEmbedding | None
-        ) = None,
+        model: ChatModelBase | None = None,
+        embedding_model: EmbeddingModelBase | None = None,
         reme_config_path: str | None = None,
+        reme_config_args: List[str] | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the ReMe-based long-term memory.
@@ -121,18 +122,27 @@ class ReMeLongTermMemoryBase(LongTermMemoryBase, metaclass=ABCMeta):
                 different users/workspaces.
             run_name (`str | None`, optional):
                 Name identifier for the current execution run or session.
-            model (`DashScopeChatModel | OpenAIChatModel | None`, optional):
+            model (`ChatModelBase | None`, optional):
                 The chat model to use for memory operations. The model's
                 API credentials and endpoint will be extracted and
-                passed to ReMe.
-            embedding_model (`DashScopeTextEmbedding | OpenAITextEmbedding | \
-            None`, optional):
+                passed to ReMe. Supports DashScopeChatModel,
+                OpenAIChatModel, and any ChatModelBase with
+                ``api_key`` and ``base_url`` attributes.
+            embedding_model (`EmbeddingModelBase | None`, optional):
                 The embedding model to use for semantic memory retrieval.
                 The model's API credentials and endpoint will be
-                extracted and passed to ReMe.
+                extracted and passed to ReMe. Supports
+                DashScopeTextEmbedding, OpenAITextEmbedding, and any
+                EmbeddingModelBase with ``api_key`` and ``base_url``
+                attributes.
             reme_config_path (`str | None`, optional):
-                Path to a custom ReMe configuration file. If not provided, ReMe
-                will use its default configuration.
+                Path to a custom ReMe configuration file. If not provided,
+                ReMe will use its default configuration.
+            reme_config_args (`List[str] | None`, optional):
+                Extra config overrides passed to ReMeApp as positional
+                args. Each entry uses the format
+                ``"section.key=value"``, for example
+                ``"embedding_model.default.backend=ark_multimodal"``.
             **kwargs (`Any`):
                 Additional keyword arguments to pass to the
                 ReMeApp constructor.
@@ -140,9 +150,8 @@ class ReMeLongTermMemoryBase(LongTermMemoryBase, metaclass=ABCMeta):
 
         Raises:
             `ValueError`:
-                If the provided model is not a DashScopeChatModel or
-                OpenAIChatModel, or if the embedding_model is not a
-                DashScopeTextEmbedding or OpenAITextEmbedding.
+                If the provided model or embedding_model credentials
+                cannot be extracted.
 
         Note:
             If the reme_ai library is not installed, a warning will be
@@ -205,11 +214,26 @@ class ReMeLongTermMemoryBase(LongTermMemoryBase, metaclass=ABCMeta):
             llm_api_key = str(getattr(model.client, "api_key", None))
 
         else:
-            raise ValueError(
-                f"model must be a DashScopeChatModel or "
-                f"OpenAIChatModel instance. "
-                f"Got {type(model).__name__} instead.",
+            # Generic extraction for other ChatModelBase subclasses
+            llm_api_key = str(
+                getattr(model, "api_key", None)
+                or getattr(getattr(model, "client", None), "api_key", None)
+                or "",
             )
+            llm_api_base = str(
+                getattr(model, "base_url", None)
+                or getattr(
+                    getattr(model, "client", None), "base_url", None,
+                )
+                or "",
+            )
+            if not llm_api_key or not llm_api_base:
+                raise ValueError(
+                    f"Cannot extract API credentials from model type "
+                    f"{type(model).__name__}. Provide a model with "
+                    f"'api_key' and 'base_url' attributes, or use "
+                    f"DashScopeChatModel / OpenAIChatModel.",
+                )
 
         # Extract model name and add to config if provided
         llm_model_name = model.model_name
@@ -235,11 +259,33 @@ class ReMeLongTermMemoryBase(LongTermMemoryBase, metaclass=ABCMeta):
             )
 
         else:
-            raise ValueError(
-                "embedding_model must be a DashScopeTextEmbedding or "
-                "OpenAITextEmbedding instance. "
-                f"Got {type(embedding_model).__name__} instead.",
+            # Generic extraction for other EmbeddingModelBase subclasses
+            embedding_api_key = str(
+                getattr(embedding_model, "api_key", None)
+                or getattr(
+                    getattr(embedding_model, "client", None),
+                    "api_key",
+                    None,
+                )
+                or "",
             )
+            embedding_api_base = str(
+                getattr(embedding_model, "base_url", None)
+                or getattr(
+                    getattr(embedding_model, "client", None),
+                    "base_url",
+                    None,
+                )
+                or "",
+            )
+            if not embedding_api_key or not embedding_api_base:
+                raise ValueError(
+                    f"Cannot extract API credentials from embedding "
+                    f"model type {type(embedding_model).__name__}. "
+                    f"Provide a model with 'api_key' and 'base_url' "
+                    f"attributes, or use DashScopeTextEmbedding / "
+                    f"OpenAITextEmbedding.",
+                )
 
         # Extract embedding model name and add to config if provided
         embedding_model_name = embedding_model.model_name
@@ -253,6 +299,10 @@ class ReMeLongTermMemoryBase(LongTermMemoryBase, metaclass=ABCMeta):
         config_args.append(
             f'embedding_model.default.params={{"dimensions": {dimensions}}}',
         )
+
+        # Append user-supplied config overrides (e.g. custom backend)
+        if reme_config_args:
+            config_args.extend(reme_config_args)
 
         # Attempt to import and initialize ReMe
         # If import fails, set app to None and issue a warning
