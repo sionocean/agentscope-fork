@@ -5,7 +5,7 @@ import React, {
   useCallback,
   KeyboardEvent,
 } from "react";
-import { streamChat } from "../api";
+import { streamChat, getHistory } from "../api";
 
 // ---------------------------------------------------------------------------
 // Local types for SSE content blocks
@@ -273,11 +273,25 @@ const ChatView: React.FC<ChatViewProps> = ({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Clear messages when session changes.
+  // Load history when session changes.
   useEffect(() => {
     setMessages([]);
     setInput("");
-  }, [sessionId]);
+    let cancelled = false;
+    getHistory(userId, sessionId).then((msgs) => {
+      if (cancelled) return;
+      const loaded: DisplayMessage[] = msgs
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({
+          id: m.id ?? `hist-${Math.random()}`,
+          role: m.role as "user" | "assistant",
+          blocks: normaliseContent(m.content),
+          timestamp: m.timestamp ?? "",
+        }));
+      setMessages(loaded);
+    }).catch(() => { /* new session, no history yet */ });
+    return () => { cancelled = true; };
+  }, [userId, sessionId]);
 
   // Auto-scroll to bottom whenever messages update.
   useEffect(() => {

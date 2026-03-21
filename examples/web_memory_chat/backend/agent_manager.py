@@ -203,6 +203,12 @@ class AgentManager:
                     sessions.append(sid)
         return sorted(sessions)
 
+    async def get_history(self, user_id: str, session_id: str) -> list[dict]:
+        """Get chat history for a session."""
+        agent = await self.get_agent(user_id, session_id)
+        msgs = await agent.memory.get_memory()
+        return [m.to_dict() for m in msgs]
+
     async def delete_session(self, user_id: str, session_id: str) -> None:
         """Delete a session's state."""
         import os

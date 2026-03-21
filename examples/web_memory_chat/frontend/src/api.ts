@@ -39,6 +39,15 @@ export async function getSessions(userId: string): Promise<string[]> {
   return (await r.json()).sessions;
 }
 
+export async function getHistory(
+  userId: string,
+  sessionId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
+  const r = await fetch(`${BASE}/history/${userId}/${sessionId}`);
+  return (await r.json()).messages ?? [];
+}
+
 export async function deleteSession(userId: string, sessionId: string) {
   await fetch(`${BASE}/sessions/${userId}/${sessionId}`, {
     method: "DELETE",

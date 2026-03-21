@@ -48,6 +48,12 @@ async def list_sessions(user_id: str):
     return {"sessions": sessions}
 
 
+@app.get("/history/{user_id}/{session_id}")
+async def get_history(user_id: str, session_id: str):
+    msgs = await manager.get_history(user_id, session_id)
+    return {"messages": msgs}
+
+
 @app.delete("/sessions/{user_id}/{session_id}")
 async def delete_session(user_id: str, session_id: str):
     await manager.delete_session(user_id, session_id)
