@@ -134,7 +134,7 @@ class AgentManager:
             toolkit=toolkit,
             memory=InMemoryMemory(),
             long_term_memory=memories["personal"],
-            long_term_memory_mode="both",
+            long_term_memory_mode="agent_control",
         )
 
         # Load session state if exists
@@ -163,18 +163,32 @@ class AgentManager:
             data = json.dumps(msg_out.to_dict(), ensure_ascii=False)
             yield f"data: {data}\n\n"
 
-        # Save session state
-        await self._session.save_session_state(
-            session_id=f"{user_id}-{session_id}",
-            agent=agent,
+        # Fire-and-forget: save session + record task memory in background
+        # so the SSE response completes immediately for the frontend.
+        asyncio.create_task(
+            self._post_chat(user_id, session_id, agent),
         )
 
-        # Record to task memory (the conversation trajectory)
-        memories = self._memories.get(user_id)
-        if memories:
-            recent = (await agent.memory.get_memory())[-4:]  # last 2 turns
-            if recent:
-                await memories["task"].record(msgs=recent, score=0.8)
+    async def _post_chat(
+        self,
+        user_id: str,
+        session_id: str,
+        agent: ReActAgent,
+    ) -> None:
+        """Background work after chat streaming completes."""
+        try:
+            await self._session.save_session_state(
+                session_id=f"{user_id}-{session_id}",
+                agent=agent,
+            )
+            memories = self._memories.get(user_id)
+            if memories:
+                recent = (await agent.memory.get_memory())[-4:]
+                if recent:
+                    await memories["task"].record(msgs=recent, score=0.8)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
 
     async def get_sessions(self, user_id: str) -> list[str]:
         """List session IDs for a user (from saved files)."""

@@ -14,10 +14,17 @@ async def brave_search(query: str, count: int = 5) -> ToolResponse:
     Returns:
         ToolResponse containing search results with titles, URLs and descriptions.
     """
+    # LLMs sometimes pass empty string or invalid values for count
+    try:
+        count = int(count) if count else 5
+    except (ValueError, TypeError):
+        count = 5
+    count = max(1, min(count, 20))
+
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             "https://api.search.brave.com/res/v1/web/search",
-            params={"q": query, "count": min(count, 20)},
+            params={"q": query, "count": count},
             headers={"X-Subscription-Token": BRAVE_API_KEY},
             timeout=15,
         )

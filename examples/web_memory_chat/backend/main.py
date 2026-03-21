@@ -69,13 +69,20 @@ async def get_memories(user_id: str):
         for row in tables:
             table = row["tablename"]
             rows = await conn.fetch(
-                f'SELECT id, content, metadata FROM "{table}" ORDER BY id DESC LIMIT 50',
+                f'SELECT unique_id, content, metadata FROM "{table}" LIMIT 50',
             )
             for r in rows:
+                import json as _json
+                meta = r["metadata"]
+                if isinstance(meta, str):
+                    try:
+                        meta = _json.loads(meta)
+                    except Exception:
+                        meta = {}
                 memories.append({
-                    "id": str(r["id"]),
+                    "id": str(r["unique_id"]),
                     "content": r["content"],
-                    "metadata": r["metadata"] if r["metadata"] else {},
+                    "metadata": meta if isinstance(meta, dict) else {},
                     "table": table,
                 })
         await conn.close()
@@ -86,4 +93,4 @@ async def get_memories(user_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8010)

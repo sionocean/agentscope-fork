@@ -29,7 +29,8 @@ interface ToolUseBlock {
 
 interface ToolResultBlock {
   type: "tool_result";
-  content: (TextBlock | { type: string; [key: string]: unknown })[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  content: any;
 }
 
 type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock | ToolResultBlock;
@@ -54,11 +55,17 @@ interface DisplayMessage {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function normaliseContent(content: string | ContentBlock[]): ContentBlock[] {
+function normaliseContent(content: unknown): ContentBlock[] {
   if (typeof content === "string") {
     return content ? [{ type: "text", text: content }] : [];
   }
-  return content;
+  if (Array.isArray(content)) {
+    return content as ContentBlock[];
+  }
+  if (content && typeof content === "object") {
+    return [{ type: "text", text: JSON.stringify(content) }];
+  }
+  return [];
 }
 
 function extractText(blocks: ContentBlock[]): string {
@@ -151,9 +158,17 @@ const ToolUseView: React.FC<{ block: ToolUseBlock }> = ({ block }) => (
 );
 
 const ToolResultView: React.FC<{ block: ToolResultBlock }> = ({ block }) => {
-  const text = block.content
-    .map((c) => (c.type === "text" ? (c as TextBlock).text : JSON.stringify(c)))
-    .join("\n");
+  const raw = block.content;
+  let text: string;
+  if (Array.isArray(raw)) {
+    text = raw
+      .map((c) => (c.type === "text" ? (c as TextBlock).text : JSON.stringify(c)))
+      .join("\n");
+  } else if (typeof raw === "string") {
+    text = raw;
+  } else {
+    text = raw ? JSON.stringify(raw) : "(empty result)";
+  }
 
   return (
     <div
