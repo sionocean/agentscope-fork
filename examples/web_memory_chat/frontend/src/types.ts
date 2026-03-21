@@ -12,3 +12,12 @@ export interface MemoryItem {
   metadata: Record<string, unknown>;
   table: string;
 }
+
+export interface DocumentItem {
+  doc_id: string;
+  filename: string;
+  file_type: string;   // "text" | "pdf" | "image"
+  chunks: number;
+  uploaded_at: string;
+  file_size: number;
+}

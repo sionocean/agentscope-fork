@@ -6,3 +6,5 @@ psycopg[binary]>=3.1.0
 asyncpg>=0.28.0
 agentscope
 reme-ai
+pypdf
+python-multipart

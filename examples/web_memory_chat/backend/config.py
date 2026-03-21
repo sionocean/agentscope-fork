@@ -21,3 +21,7 @@ BRAVE_API_KEY = os.environ["BRAVE_API_KEY"]
 # ReMe language: "zh" for Chinese, "en" for English
 # NOTE: use "zh" not "cn" — prompt templates use _zh suffix
 REME_LANGUAGE = os.environ.get("REME_LANGUAGE", "zh")
+
+# Knowledge / RAG settings
+KNOWLEDGE_CHUNK_SIZE = int(os.environ.get("KNOWLEDGE_CHUNK_SIZE", "512"))
+KNOWLEDGE_SPLIT_BY = os.environ.get("KNOWLEDGE_SPLIT_BY", "paragraph")

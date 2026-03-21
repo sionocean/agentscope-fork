@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import ChatView from "./components/ChatView";
 import MemoryPanel from "./components/MemoryPanel";
+import KnowledgePanel from "./components/KnowledgePanel";
 import { getSessions, deleteSession } from "./api";
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
   const [sessions, setSessions] = useState<string[]>([]);
   const [memoryRefresh, setMemoryRefresh] = useState(0);
   const [showMemory, setShowMemory] = useState(true);
+  const [rightTab, setRightTab] = useState<"memory" | "knowledge">("memory");
 
   // Apply global body styles
   useEffect(() => {
@@ -145,9 +147,48 @@ export default function App() {
           {showMemory ? "▶" : "◀"}
         </button>
 
-        {/* MemoryPanel */}
+        {/* Right tab panel */}
         {showMemory && (
-          <MemoryPanel userId={userId} refreshTrigger={memoryRefresh} />
+          <div style={{
+            width: 380, borderLeft: "1px solid #333", display: "flex",
+            flexDirection: "column", background: "#1a1a1a",
+          }}>
+            {/* Tab bar */}
+            <div style={{
+              display: "flex", borderBottom: "1px solid #333",
+            }}>
+              {(["memory", "knowledge"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setRightTab(tab)}
+                  style={{
+                    flex: 1, padding: "8px 0", border: "none",
+                    background: rightTab === tab ? "#2a2a2a" : "transparent",
+                    color: rightTab === tab ? "#fff" : "#888",
+                    cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    borderBottom: rightTab === tab
+                      ? "2px solid #60a5fa" : "2px solid transparent",
+                  }}
+                >
+                  {tab === "memory" ? "Memory" : "Knowledge"}
+                </button>
+              ))}
+            </div>
+            {/* Panel content */}
+            <div style={{ flex: 1, overflow: "hidden", padding: 8 }}>
+              {rightTab === "memory" ? (
+                <MemoryPanel
+                  userId={userId}
+                  refreshTrigger={memoryRefresh}
+                />
+              ) : (
+                <KnowledgePanel
+                  userId={userId}
+                  refreshKey={memoryRefresh}
+                />
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

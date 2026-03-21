@@ -114,6 +114,12 @@ approaches.
 ## Web Search (brave_search)
 Use `brave_search` to find up-to-date information from the web.
 
+## Knowledge Base (search_knowledge)
+Use `search_knowledge` to find information from the user's uploaded \
+documents (PDF, text, markdown, images). Use this when the user asks \
+about content they have uploaded. For general web queries, use \
+`brave_search` instead.
+
 ## General Rules
 - Always respond in the same language as the user.
 - Always check memory before saying you don't know something \
@@ -265,6 +271,11 @@ class AgentManager:
         toolkit.register_tool_function(record_task_experience)
         toolkit.register_tool_function(retrieve_task_experience)
 
+        # Knowledge Base: register search tool if knowledge manager is available
+        if hasattr(self, 'knowledge_mgr') and self.knowledge_mgr is not None:
+            search_knowledge = self.knowledge_mgr.make_search_tool(user_id)
+            toolkit.register_tool_function(search_knowledge)
+
         # ── Create agent ──
         agent = ReActAgent(
             name="Friday",
@@ -288,7 +299,8 @@ class AgentManager:
         log.framework(
             "agent_ready", user=user_id, session=session_id[:8],
             tools="brave_search,record_to_memory,retrieve_from_memory,"
-                  "record_task_experience,retrieve_task_experience",
+                  "record_task_experience,retrieve_task_experience,"
+                  "search_knowledge",
         )
         return agent
 

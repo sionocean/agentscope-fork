@@ -74,8 +74,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from agent_manager import AgentManager
+from knowledge_manager import KnowledgeManager
 
 manager = AgentManager()
+knowledge_mgr = KnowledgeManager()
+manager.knowledge_mgr = knowledge_mgr
 
 
 @asynccontextmanager
@@ -92,6 +95,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+import os as _os
+from fastapi.staticfiles import StaticFiles
+
+_uploads_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "uploads")
+_os.makedirs(_uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 
 @app.get("/health")
@@ -171,6 +181,47 @@ async def get_memories(user_id: str):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     return {"memories": memories}
+
+
+from fastapi import UploadFile, File
+
+
+@app.post("/documents/{user_id}")
+async def upload_document(user_id: str, file: UploadFile = File(...)):
+    """Upload and index a document."""
+    try:
+        file_bytes = await file.read()
+        result = await knowledge_mgr.upload_document(
+            user_id, file.filename, file_bytes,
+        )
+        return {"status": "indexed", "document": result}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/documents/{user_id}")
+async def list_documents(user_id: str):
+    """List indexed documents for a user."""
+    docs = knowledge_mgr.list_documents(user_id)
+    return {"documents": docs}
+
+
+@app.delete("/documents/{user_id}/{doc_id}")
+async def delete_document(user_id: str, doc_id: str):
+    """Delete a document by doc_id."""
+    found = await knowledge_mgr.delete_document(user_id, doc_id)
+    if not found:
+        return JSONResponse({"error": "Document not found"}, status_code=404)
+    return {"status": "deleted"}
+
+
+@app.delete("/documents/{user_id}")
+async def clear_documents(user_id: str):
+    """Delete all documents for a user."""
+    count = await knowledge_mgr.clear_documents(user_id)
+    return {"status": "cleared", "deleted": count}
 
 
 if __name__ == "__main__":

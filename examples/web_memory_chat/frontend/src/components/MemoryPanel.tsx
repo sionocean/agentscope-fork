@@ -165,9 +165,7 @@ export default function MemoryPanel({ userId, refreshTrigger }: MemoryPanelProps
   return (
     <aside
       style={{
-        width: 300,
-        minWidth: 300,
-        maxWidth: 300,
+        width: "100%",
         height: "100%",
         background: "#111",
         borderLeft: "1px solid #1e1e1e",

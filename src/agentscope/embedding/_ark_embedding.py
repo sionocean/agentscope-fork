@@ -32,13 +32,40 @@ from ._embedding_usage import EmbeddingUsage
 from ..message import TextBlock
 
 
+def _to_ark_input(item: Any) -> dict:
+    """Convert an embedding input item to Ark API format.
+
+    Accepts: str, TextBlock, or ImageBlock.
+    """
+    if isinstance(item, str):
+        return {"type": "text", "text": item}
+    if isinstance(item, dict):
+        item_type = item.get("type")
+        if item_type == "text":
+            return {"type": "text", "text": item["text"]}
+        if item_type == "image":
+            source = item["source"]
+            if source["type"] == "url":
+                url = source["url"]
+            elif source["type"] == "base64":
+                url = (
+                    f"data:{source['media_type']};base64,{source['data']}"
+                )
+            else:
+                raise ValueError(
+                    f"Unsupported image source type: {source['type']}",
+                )
+            return {"type": "image_url", "image_url": {"url": url}}
+    raise ValueError(f"Unsupported embedding input: {type(item)}")
+
+
 def _ark_post_sync(
     base_url: str,
     api_key: str,
     model_name: str,
-    text: str,
+    ark_input: dict,
 ) -> tuple[list[float], int]:
-    """Synchronous single-text embedding call."""
+    """Synchronous single-item embedding call."""
     import httpx
 
     resp = httpx.post(
@@ -49,7 +76,7 @@ def _ark_post_sync(
         },
         json={
             "model": model_name,
-            "input": [{"type": "text", "text": text}],
+            "input": [ark_input],
         },
         timeout=60,
     )
@@ -69,9 +96,9 @@ async def _ark_post_async(
     base_url: str,
     api_key: str,
     model_name: str,
-    text: str,
+    ark_input: dict,
 ) -> tuple[list[float], int]:
-    """Asynchronous single-text embedding call (reuses client)."""
+    """Asynchronous single-item embedding call (reuses client)."""
     resp = await client.post(
         f"{base_url}/embeddings/multimodal",
         headers={
@@ -80,7 +107,7 @@ async def _ark_post_async(
         },
         json={
             "model": model_name,
-            "input": [{"type": "text", "text": text}],
+            "input": [ark_input],
         },
         timeout=60,
     )
@@ -103,7 +130,7 @@ class ArkEmbedding(EmbeddingModelBase):
     concurrently via ``asyncio.gather``).
     """
 
-    supported_modalities: list[str] = ["text"]
+    supported_modalities: list[str] = ["text", "image"]
 
     def __init__(
         self,
@@ -126,20 +153,12 @@ class ArkEmbedding(EmbeddingModelBase):
     ) -> EmbeddingResponse:
         import httpx
 
-        # Normalise to plain strings
-        texts: list[str] = []
-        for item in text:
-            if isinstance(item, dict) and "text" in item:
-                texts.append(item["text"])
-            elif isinstance(item, str):
-                texts.append(item)
-            else:
-                raise ValueError(f"Unsupported input type: {type(item)}.")
+        ark_inputs = [_to_ark_input(item) for item in text]
 
         if self.embedding_cache:
             cache_key = {
                 "model": self.model_name,
-                "texts": texts,
+                "ark_inputs": ark_inputs,
                 "dimensions": self.dimensions,
             }
             cached = await self.embedding_cache.retrieve(
@@ -157,9 +176,9 @@ class ArkEmbedding(EmbeddingModelBase):
             tasks = [
                 _ark_post_async(
                     client, self.base_url, self.api_key,
-                    self.model_name, t,
+                    self.model_name, ark_input,
                 )
-                for t in texts
+                for ark_input in ark_inputs
             ]
             results = await asyncio.gather(*tasks)
 
@@ -250,14 +269,14 @@ def register_ark_embedding_backend() -> None:
             if isinstance(input_text, str):
                 emb, _ = _ark_post_sync(
                     self.base_url, self.api_key,
-                    self.model_name, input_text,
+                    self.model_name, _to_ark_input(input_text),
                 )
                 return emb
 
             results = [
                 _ark_post_sync(
                     self.base_url, self.api_key,
-                    self.model_name, t,
+                    self.model_name, _to_ark_input(t),
                 )
                 for t in input_text
             ]
@@ -277,7 +296,7 @@ def register_ark_embedding_backend() -> None:
                 tasks = [
                     _ark_post_async(
                         client, self.base_url, self.api_key,
-                        self.model_name, t,
+                        self.model_name, _to_ark_input(t),
                     )
                     for t in texts
                 ]

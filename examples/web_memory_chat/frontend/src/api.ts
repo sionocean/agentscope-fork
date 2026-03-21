@@ -1,4 +1,4 @@
-import type { MemoryItem } from "./types";
+import type { MemoryItem, DocumentItem } from "./types";
 
 const BASE = "/api";
 
@@ -62,4 +62,41 @@ export async function getMemories(userId: string): Promise<MemoryItem[]> {
 export async function clearMemories(userId: string): Promise<number> {
   const r = await fetch(`${BASE}/memories/${userId}`, { method: "DELETE" });
   return (await r.json()).deleted ?? 0;
+}
+
+export async function getDocuments(
+  userId: string,
+): Promise<DocumentItem[]> {
+  const res = await fetch(`${BASE}/documents/${userId}`);
+  const data = await res.json();
+  return data.documents ?? [];
+}
+
+export async function uploadDocument(
+  userId: string,
+  file: File,
+): Promise<DocumentItem> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE}/documents/${userId}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Upload failed");
+  }
+  const data = await res.json();
+  return data.document;
+}
+
+export async function deleteDocument(
+  userId: string,
+  docId: string,
+): Promise<void> {
+  await fetch(`${BASE}/documents/${userId}/${docId}`, { method: "DELETE" });
+}
+
+export async function clearDocuments(userId: string): Promise<void> {
+  await fetch(`${BASE}/documents/${userId}`, { method: "DELETE" });
 }
